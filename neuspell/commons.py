@@ -5,7 +5,7 @@ from .util import is_module_available, get_module_or_attr
 
 """ default paths """
 
-DEFAULT_DATA_PATH = os.path.join(os.path.split(__file__)[0], "../data")
+DEFAULT_DATA_PATH = os.path.abspath(os.environ.get("NEUSPELL_DATA", os.path.join(os.path.split(__file__)[0], "../data")))
 print(f"data folder is set to `{DEFAULT_DATA_PATH}` script")
 if not os.path.exists(DEFAULT_DATA_PATH):
     os.makedirs(DEFAULT_DATA_PATH)
