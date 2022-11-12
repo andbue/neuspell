@@ -19,6 +19,12 @@ def download_file_from_google_drive(id, destination):
         response = session.get(URL, params=params, stream=True)
 
     save_response_content(response, destination)
+    
+    # https://github.com/neuspell/neuspell/issues/73
+    saved_size = os.path.getsize(destination)
+    if saved_size < 10000:
+        response = session.get(URL, params={'id': id, 'confirm': 't'}, stream = True)
+        save_response_content(response, destination)
 
 
 def get_confirm_token(response):
