@@ -625,7 +625,7 @@ def bert_tokenize_for_valid_examples(batch_original_sentences, batch_noisy_sente
 
     if BERT_TOKENIZER is None:  # gets initialized during the first call to this method
         if bert_pretrained_name_or_path:
-            BERT_TOKENIZER = transformers.AutoTokenizer.from_pretrained(bert_pretrained_name_or_path)
+            BERT_TOKENIZER = transformers.AutoTokenizer.from_pretrained(bert_pretrained_name_or_path, add_prefix_space=True)
         else:
             BERT_TOKENIZER = transformers.AutoTokenizer.from_pretrained('bert-base-cased')
 
