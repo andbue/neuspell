@@ -638,14 +638,15 @@ def bert_tokenize_for_valid_examples(batch_original_sentences, batch_noisy_sente
     else:
         _batch_noisy_sentences = _batch_original_sentences
     
-    valid_pairs = [p for p in zip(_batch_original_sentences, _batch_noisy_sentences) if len(p[0].split()) == len(p[1].split()) ]
+    valid_pairs = [p for p in zip(_batch_original_sentences, _batch_noisy_sentences) 
+                   if len(p[0].split()) and len(p[0].split()) == len(p[1].split()) ]
     batch_original_sentences, batch_noisy_sentences = map(list, zip(*valid_pairs)) if valid_pairs else ([], [])
 
     if batch_original_sentences:
         enc = BERT_TOKENIZER([s.split() for s in batch_noisy_sentences], return_tensors="pt", is_split_into_words=True, padding=True, truncation=True)
     else:
         enc = transformers.BatchEncoding({"attention_mask": [], "input_ids": []})
-    
+
     return batch_original_sentences, batch_noisy_sentences, enc
 
 ################################################
