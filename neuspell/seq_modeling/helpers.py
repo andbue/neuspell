@@ -631,23 +631,28 @@ def bert_tokenize_for_valid_examples(batch_original_sentences, batch_noisy_sente
         if BERT_TOKENIZER.model_max_length > 10000:
             BERT_TOKENIZER.model_max_length = 512
 
+    sents_original = [s.split() for s in batch_original_sentences]
+    sents_noisy = [s.split() for s in batch_noisy_sentences]
+
+
     # round trip through the tokenizer, encoder, decoder...
-    _batch_original_sentences = BERT_TOKENIZER.batch_decode(BERT_TOKENIZER(batch_original_sentences, truncation=True)["input_ids"], skip_special_tokens=True)
+    enc_original = BERT_TOKENIZER(sents_original, is_split_into_words=True, truncation=True)
+    wlen_original = [1+(max(enc.word_ids, key=lambda x: x or -1) or -1) for enc in enc_original.encodings]
     if batch_original_sentences != batch_noisy_sentences:
-        _batch_noisy_sentences = BERT_TOKENIZER.batch_decode(BERT_TOKENIZER(batch_noisy_sentences, truncation=True)["input_ids"], skip_special_tokens=True)
+        enc_noisy = BERT_TOKENIZER(sents_original, is_split_into_words=True, truncation=True)
+        wlen_noisy = [1+(max(enc.word_ids, key=lambda x: x or -1) or -1) for enc in enc_noisy.encodings]
     else:
-        _batch_noisy_sentences = _batch_original_sentences
+        wlen_noisy = wlen_original
     
-    valid_pairs = [p for p in zip(_batch_original_sentences, _batch_noisy_sentences) 
-                   if len(p[0].split()) and len(p[0].split()) == len(p[1].split()) ]
-    batch_original_sentences, batch_noisy_sentences = map(list, zip(*valid_pairs)) if valid_pairs else ([], [])
+    valid_pairs = [(s_o[:l_o], s_n[:l_n]) for s_o, s_n, l_o, l_n in zip(sents_original, sents_noisy, wlen_original, wlen_noisy) 
+                   if l_o > 0 and l_o == l_n]
+    sents_original, sents_noisy = map(list, zip(*valid_pairs)) if valid_pairs else ([], [])
 
     if batch_original_sentences:
-        enc = BERT_TOKENIZER([s.split() for s in batch_noisy_sentences], return_tensors="pt", is_split_into_words=True, padding=True, truncation=True)
+        enc = BERT_TOKENIZER(sents_original, return_tensors="pt", is_split_into_words=True, padding=True, truncation=True)
     else:
         enc = transformers.BatchEncoding({"attention_mask": [], "input_ids": []})
-
-    return batch_original_sentences, batch_noisy_sentences, enc
+    return [" ".join(s) for s in sents_original], [" ".join(s) for s in sents_noisy], enc
 
 ################################################
 # <-----
