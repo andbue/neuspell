@@ -628,6 +628,8 @@ def bert_tokenize_for_valid_examples(batch_original_sentences, batch_noisy_sente
             BERT_TOKENIZER = transformers.AutoTokenizer.from_pretrained(bert_pretrained_name_or_path, add_prefix_space=True)
         else:
             BERT_TOKENIZER = transformers.AutoTokenizer.from_pretrained('bert-base-cased')
+        if BERT_TOKENIZER.model_max_length > 10000:
+            BERT_TOKENIZER.model_max_length = 512
 
     # round trip through the tokenizer, encoder, decoder...
     _batch_original_sentences = BERT_TOKENIZER.batch_decode(BERT_TOKENIZER(batch_original_sentences, truncation=True)["input_ids"], skip_special_tokens=True)
