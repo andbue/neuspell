@@ -630,9 +630,9 @@ def bert_tokenize_for_valid_examples(batch_original_sentences, batch_noisy_sente
             BERT_TOKENIZER = transformers.AutoTokenizer.from_pretrained('bert-base-cased')
 
     # round trip through the tokenizer, encoder, decoder...
-    _batch_original_sentences = BERT_TOKENIZER.batch_decode(BERT_TOKENIZER(batch_original_sentences)["input_ids"], skip_special_tokens=True, truncation=True)
+    _batch_original_sentences = BERT_TOKENIZER.batch_decode(BERT_TOKENIZER(batch_original_sentences, truncation=True)["input_ids"], skip_special_tokens=True)
     if batch_original_sentences != batch_noisy_sentences:
-        _batch_noisy_sentences = BERT_TOKENIZER.batch_decode(BERT_TOKENIZER(batch_noisy_sentences)["input_ids"], skip_special_tokens=True, truncation=True)
+        _batch_noisy_sentences = BERT_TOKENIZER.batch_decode(BERT_TOKENIZER(batch_noisy_sentences, truncation=True)["input_ids"], skip_special_tokens=True)
     else:
         _batch_noisy_sentences = _batch_original_sentences
     
@@ -641,12 +641,10 @@ def bert_tokenize_for_valid_examples(batch_original_sentences, batch_noisy_sente
 
     if batch_original_sentences:
         enc = BERT_TOKENIZER([s.split() for s in batch_noisy_sentences], return_tensors="pt", is_split_into_words=True, padding=True, truncation=True)
-        batch_splits = [[wtt.end - wtt.start for w_id in range(len(s.split())) for wtt in [enc.word_to_tokens(batch_id, w_id)]] for batch_id, s in enumerate(batch_noisy_sentences)]
     else:
         enc = transformers.BatchEncoding({"attention_mask": [], "input_ids": []})
-        batch_splits = []
-
-    return batch_original_sentences, batch_noisy_sentences, enc, batch_splits
+    
+    return batch_original_sentences, batch_noisy_sentences, enc
 
 ################################################
 # <-----

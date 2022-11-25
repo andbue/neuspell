@@ -871,7 +871,6 @@ class SubwordBert(nn.Module):
         self.bert_model = get_pretrained_bert(bert_pretrained_name_or_path)
         self.bertmodule_outdim = self.bert_model.config.hidden_size
         if freeze_bert:
-            # Uncomment to freeze BERT layers
             for param in self.bert_model.parameters():
                 param.requires_grad = False
 
@@ -888,30 +887,23 @@ class SubwordBert(nn.Module):
     def device(self) -> torch.device:
         return next(self.parameters()).device
 
-    def get_merged_encodings(self, bert_seq_encodings, seq_splits, mode='avg'):
-        bert_seq_encodings = bert_seq_encodings[:sum(seq_splits) + 2, :]  # 2 for [CLS] and [SEP]
-        bert_seq_encodings = bert_seq_encodings[1:-1, :]
-        # a tuple of tensors
-        split_encoding = torch.split(bert_seq_encodings, seq_splits, dim=0)
+    def get_merged_encodings(self, bert_seq_encodings, inputenc, mode='avg'):
+        word_ids = dict.fromkeys(x for x in inputenc.word_ids if x != None)
+        split_encoding = (bert_seq_encodings[slice(*ts)] for ts in (inputenc.word_to_tokens(w_ix) for w_ix in word_ids))
         batched_encodings = pad_sequence(split_encoding, batch_first=True, padding_value=0)
         if mode == 'avg':
-            seq_splits = torch.tensor(seq_splits).reshape(-1, 1).to(self.device)
-            out = torch.div(torch.sum(batched_encodings, dim=1), seq_splits)
+            out = batched_encodings.mean(axis=1)
         elif mode == "add":
-            out = torch.sum(batched_encodings, dim=1)
+            out = batched_encodings.sum(axis=1)
         else:
             raise Exception("Not Implemented")
         return out
 
     def forward(self,
                 batch_bert_dict: "{'input_ids':tensor, 'attention_mask':tensor, 'token_type_ids':tensor}",
-                batch_splits: "list[list[int]]",
                 aux_word_embs: "tensor" = None,
                 targets: "tensor" = None,
                 topk=1):
-
-        # cnn
-        batch_size = len(batch_splits)
 
         # bert
         # BS X max_nsubwords x self.bertmodule_outdim
@@ -919,8 +911,8 @@ class SubwordBert(nn.Module):
         bert_encodings = self.bert_dropout(bert_encodings)
         # BS X max_nwords x self.bertmodule_outdim
         bert_merged_encodings = pad_sequence(
-            [self.get_merged_encodings(bert_seq_encodings, seq_splits, mode='avg') \
-             for bert_seq_encodings, seq_splits in zip(bert_encodings, batch_splits)],
+            [self.get_merged_encodings(bert_seq_encodings, inputenc, mode='avg') \
+             for bert_seq_encodings, inputenc in zip(bert_encodings, batch_bert_dict.encodings)],
             batch_first=True,
             padding_value=0
         )
@@ -937,8 +929,7 @@ class SubwordBert(nn.Module):
         logits = self.dense(intermediate_encodings)
 
         # loss
-        if targets is not None:
-            assert len(targets) == batch_size  # targets:[[BS,max_nwords]
+        if targets is not None:  # targets:[[BS,max_nwords]
             logits_permuted = logits.permute(0, 2, 1)  # logits: [BS,output_dim,max_nwords]
             loss = self.criterion(logits_permuted, targets)
 

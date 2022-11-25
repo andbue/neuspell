@@ -75,6 +75,8 @@ class BertChecker(Corrector):
                  data_dir="",
                  validation_split=0.2,
                  n_epochs=2,
+                 train_batch_size=16,
+                 valid_batch_size=32,
                  new_vocab_list: List = None):
 
         if new_vocab_list:
@@ -95,7 +97,6 @@ class BertChecker(Corrector):
         # training and validation
         #############################################
         model, vocab = self.model, self.vocab
-        TRAIN_BATCH_SIZE, VALID_BATCH_SIZE = 16, 32
         GRADIENT_ACC = 4
         DEVICE = self.device
         START_EPOCH, N_EPOCHS = 0, n_epochs
@@ -125,7 +126,7 @@ class BertChecker(Corrector):
             {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
             {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
         ]
-        t_total = int(len(train_data) / TRAIN_BATCH_SIZE / GRADIENT_ACC * N_EPOCHS)
+        t_total = int(len(train_data) / train_batch_size / GRADIENT_ACC * N_EPOCHS)
         if t_total == 0:
             t_total = 1
         optimizer = BertAdam(optimizer_grouped_parameters, lr=5e-5, warmup=0.1, t_total=t_total)
@@ -164,13 +165,13 @@ class BertChecker(Corrector):
             print("train_data size: {}".format(len(train_data)))
             progress_write_file.write("train_data size: {}\n".format(len(train_data)))
             progress_write_file.flush()
-            train_data_iter = batch_iter(train_data, batch_size=TRAIN_BATCH_SIZE, shuffle=True)
-            nbatches = int(np.ceil(len(train_data) / TRAIN_BATCH_SIZE))
+            train_data_iter = batch_iter(train_data, batch_size=train_batch_size, shuffle=True)
+            nbatches = int(np.ceil(len(train_data) / train_batch_size))
             optimizer.zero_grad()
             for batch_id, (batch_labels, batch_sentences) in enumerate(train_data_iter):
                 st_time = time.time()
                 # set batch data for bert
-                batch_labels_, batch_sentences_, batch_bert_inp, batch_bert_splits = \
+                batch_labels_, batch_sentences_, batch_bert_inp = \
                     bert_tokenize_for_valid_examples(batch_labels, batch_sentences, self.bert_pretrained_name_or_path)
                 if len(batch_labels_) == 0:
                     print("################")
@@ -187,7 +188,7 @@ class BertChecker(Corrector):
                 batch_labels = batch_labels.to(DEVICE)
                 # forward
                 model.train()
-                loss = model(batch_bert_inp, batch_bert_splits, targets=batch_labels)
+                loss = model(batch_bert_inp, targets=batch_labels)
                 batch_loss = loss.cpu().detach().numpy()
                 train_loss += batch_loss
                 # backward
@@ -205,7 +206,7 @@ class BertChecker(Corrector):
                     train_acc_count += 1
                     model.eval()
                     with torch.no_grad():
-                        _, batch_predictions = model(batch_bert_inp, batch_bert_splits, targets=batch_labels)
+                        _, batch_predictions = model(batch_bert_inp, targets=batch_labels)
                     model.train()
                     batch_labels = batch_labels.cpu().detach().numpy()
                     batch_lengths = batch_lengths.cpu().detach().numpy()
@@ -214,12 +215,12 @@ class BertChecker(Corrector):
                     train_acc += batch_acc
                     # update progress
                 progressBar(batch_id + 1,
-                            int(np.ceil(len(train_data) / TRAIN_BATCH_SIZE)),
+                            int(np.ceil(len(train_data) / train_batch_size)),
                             ["batch_time", "batch_loss", "avg_batch_loss", "batch_acc", "avg_batch_acc"],
                             [time.time() - st_time, batch_loss, train_loss / (batch_id + 1), batch_acc,
                              train_acc / train_acc_count])
                 if batch_id == 0 or (batch_id + 1) % 5000 == 0:
-                    nb = int(np.ceil(len(train_data) / TRAIN_BATCH_SIZE))
+                    nb = int(np.ceil(len(train_data) / train_batch_size))
                     progress_write_file.write(f"{batch_id + 1}/{nb}\n")
                     progress_write_file.write(
                         f"batch_time: {time.time() - st_time}, avg_batch_loss: {train_loss / (batch_id + 1)}, "
@@ -233,11 +234,11 @@ class BertChecker(Corrector):
             print("valid_data size: {}".format(len(valid_data)))
             progress_write_file.write("valid_data size: {}\n".format(len(valid_data)))
             progress_write_file.flush()
-            valid_data_iter = batch_iter(valid_data, batch_size=VALID_BATCH_SIZE, shuffle=False)
+            valid_data_iter = batch_iter(valid_data, batch_size=valid_batch_size, shuffle=False)
             for batch_id, (batch_labels, batch_sentences) in enumerate(valid_data_iter):
                 st_time = time.time()
                 # set batch data for bert
-                batch_labels_, batch_sentences_, batch_bert_inp, batch_bert_splits = \
+                batch_labels_, batch_sentences_, batch_bert_inp = \
                     bert_tokenize_for_valid_examples(batch_labels, batch_sentences, self.bert_pretrained_name_or_path)
                 if len(batch_labels_) == 0:
                     print("################")
@@ -255,7 +256,7 @@ class BertChecker(Corrector):
                 # forward
                 model.eval()
                 with torch.no_grad():
-                    batch_loss, batch_predictions = model(batch_bert_inp, batch_bert_splits, targets=batch_labels)
+                    batch_loss, batch_predictions = model(batch_bert_inp, targets=batch_labels)
                 model.train()
                 valid_loss += batch_loss
                 # compute accuracy in numpy
@@ -266,12 +267,12 @@ class BertChecker(Corrector):
                 valid_acc += batch_acc
                 # update progress
                 progressBar(batch_id + 1,
-                            int(np.ceil(len(valid_data) / VALID_BATCH_SIZE)),
+                            int(np.ceil(len(valid_data) / valid_batch_size)),
                             ["batch_time", "batch_loss", "avg_batch_loss", "batch_acc", "avg_batch_acc"],
                             [time.time() - st_time, batch_loss, valid_loss / (batch_id + 1), batch_acc,
                              valid_acc / (batch_id + 1)])
                 if batch_id == 0 or (batch_id + 1) % 2000 == 0:
-                    nb = int(np.ceil(len(valid_data) / VALID_BATCH_SIZE))
+                    nb = int(np.ceil(len(valid_data) / valid_batch_size))
                     progress_write_file.write(f"{batch_id}/{nb}\n")
                     progress_write_file.write(
                         f"batch_time: {time.time() - st_time}, avg_batch_loss: {valid_loss / (batch_id + 1)}, "

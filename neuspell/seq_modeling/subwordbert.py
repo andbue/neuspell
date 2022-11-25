@@ -77,7 +77,7 @@ def model_predictions(model, data, vocab, device, batch_size=16):
     model.to(device)
     for batch_id, (batch_labels, batch_sentences) in enumerate(data_iter):
         # set batch data for bert
-        batch_labels_, batch_sentences_, batch_bert_inp, batch_bert_splits = bert_tokenize_for_valid_examples(
+        batch_labels_, batch_sentences_, batch_bert_inp = bert_tokenize_for_valid_examples(
             batch_labels, batch_sentences)
         if len(batch_labels_) == 0:
             print("################")
@@ -87,7 +87,7 @@ def model_predictions(model, data, vocab, device, batch_size=16):
             continue
         else:
             batch_labels, batch_sentences = batch_labels_, batch_sentences_
-        batch_bert_inp = {k: v.to(device) for k, v in batch_bert_inp.items()}
+        batch_bert_inp.to(device)
         # set batch data for others
         batch_labels_ids, batch_lengths = labelize(batch_labels, vocab)
         # batch_lengths = batch_lengths.to(device)
@@ -97,7 +97,7 @@ def model_predictions(model, data, vocab, device, batch_size=16):
             """
             NEW: batch_predictions can now be of shape (batch_size,batch_max_seq_len,topk) if topk>1, else (batch_size,batch_max_seq_len)
             """
-            _, batch_predictions = model(batch_bert_inp, batch_bert_splits, targets=batch_labels_ids, topk=topk)
+            _, batch_predictions = model(batch_bert_inp, targets=batch_labels_ids, topk=topk)
         batch_predictions = untokenize_without_unks(batch_predictions, batch_lengths, vocab, batch_labels)
         final_sentences.extend(batch_predictions)
     # print("total inference time for this data is: {:4f} secs".format(time.time()-inference_st_time))
@@ -128,7 +128,7 @@ def model_inference(model, data, topk, device, batch_size=16, vocab_=None):
         torch.cuda.empty_cache()
         st_time = time.time()
         # set batch data for bert
-        batch_labels_, batch_sentences_, batch_bert_inp, batch_bert_splits = bert_tokenize_for_valid_examples(
+        batch_labels_, batch_sentences_, batch_bert_inp = bert_tokenize_for_valid_examples(
             batch_labels, batch_sentences)
         if len(batch_labels_) == 0:
             print("################")
@@ -138,7 +138,7 @@ def model_inference(model, data, topk, device, batch_size=16, vocab_=None):
             continue
         else:
             batch_labels, batch_sentences = batch_labels_, batch_sentences_
-        batch_bert_inp = {k: v.to(device) for k, v in batch_bert_inp.items()}
+        batch_bert_inp.to(device)
         # set batch data for others
         batch_labels_ids, batch_lengths = labelize(batch_labels, vocab)
         # batch_lengths = batch_lengths.to(device)
@@ -149,7 +149,7 @@ def model_inference(model, data, topk, device, batch_size=16, vocab_=None):
                 """
                 NEW: batch_predictions can now be of shape (batch_size,batch_max_seq_len,topk) if topk>1, else (batch_size,batch_max_seq_len)
                 """
-                batch_loss, batch_predictions = model(batch_bert_inp, batch_bert_splits, targets=batch_labels_ids,
+                batch_loss, batch_predictions = model(batch_bert_inp, targets=batch_labels_ids,
                                                       topk=topk)
         except RuntimeError:
             print(f"batch_bert_inp:{len(batch_bert_inp.keys())},batch_labels_ids:{batch_labels_ids.shape}")
