@@ -630,6 +630,8 @@ def bert_tokenize_for_valid_examples(batch_original_sentences, batch_noisy_sente
             BERT_TOKENIZER = transformers.AutoTokenizer.from_pretrained('bert-base-cased')
         if BERT_TOKENIZER.model_max_length > 10000:
             BERT_TOKENIZER.model_max_length = 512
+        if bert_pretrained_name_or_path and "roberta" in bert_pretrained_name_or_path:
+            BERT_TOKENIZER.model_max_length -= 2  # for some reason roberta accepts only 510 inputs
 
     sents_original = [s.split() for s in batch_original_sentences]
     sents_noisy = [s.split() for s in batch_noisy_sentences]
