@@ -890,11 +890,10 @@ class SubwordBert(nn.Module):
     def get_merged_encodings(self, bert_seq_encodings, inputenc, mode='avg'):
         word_ids = dict.fromkeys(x for x in inputenc.word_ids if x != None)
         split_encoding = (bert_seq_encodings[slice(*ts)] for ts in (inputenc.word_to_tokens(w_ix) for w_ix in word_ids))
-        batched_encodings = pad_sequence(split_encoding, batch_first=True, padding_value=0)
         if mode == 'avg':
-            out = batched_encodings.mean(axis=1)
+            out = torch.stack(tuple(t.mean(axis=0) for t in split_encoding))
         elif mode == "add":
-            out = batched_encodings.sum(axis=1)
+            out = torch.stack(tuple(t.sum(axis=0) for t in split_encoding))
         else:
             raise Exception("Not Implemented")
         return out
