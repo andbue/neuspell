@@ -99,7 +99,7 @@ class BertChecker(Corrector):
         model, vocab = self.model, self.vocab
         GRADIENT_ACC = 4
         DEVICE = self.device
-        START_EPOCH, N_EPOCHS = 0, n_epochs
+        START_EPOCH = 0 
         CHECKPOINT_PATH = os.path.join(self.ckpt_path if self.ckpt_path else data_dir, "new_models",
                                        os.path.split(self.bert_pretrained_name_or_path)[-1])
         if os.path.exists(CHECKPOINT_PATH):
@@ -126,7 +126,7 @@ class BertChecker(Corrector):
             {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
             {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
         ]
-        t_total = int(len(train_data) / train_batch_size / GRADIENT_ACC * N_EPOCHS)
+        t_total = int(len(train_data) / train_batch_size / GRADIENT_ACC * n_epochs)
         if t_total == 0:
             t_total = 1
         optimizer = BertAdam(optimizer_grouped_parameters, lr=5e-5, warmup=0.1, t_total=t_total)
@@ -135,7 +135,7 @@ class BertChecker(Corrector):
         model.to(DEVICE)
 
         # load parameters if not training from scratch
-        if START_EPOCH > 1:
+        if START_EPOCH > 0:
             progress_write_file = (
                 open(os.path.join(CHECKPOINT_PATH, f"progress_retrain_from_epoch{START_EPOCH}.txt"), 'w')
             )
@@ -148,7 +148,7 @@ class BertChecker(Corrector):
         progress_write_file.flush()
 
         # train and eval
-        for epoch_id in range(START_EPOCH, N_EPOCHS + 1):
+        for epoch_id in range(START_EPOCH, START_EPOCH + n_epochs):
             # check for patience
             if (epoch_id - argmax_dev_acc) > patience:
                 print("patience count reached. early stopping initiated")
