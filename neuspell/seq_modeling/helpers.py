@@ -636,20 +636,18 @@ def bert_tokenize_for_valid_examples(batch_original_sentences, batch_noisy_sente
     sents_original = [s.split() for s in batch_original_sentences]
     sents_noisy = [s.split() for s in batch_noisy_sentences]
 
-
     # round trip through the tokenizer, encoder, decoder...
     enc_original = BERT_TOKENIZER(sents_original, is_split_into_words=True, truncation=True)
-    wlen_original = [1+(max(enc.word_ids, key=lambda x: x or -1) or -1) for enc in enc_original.encodings]
+    wlen_original = [1+(max(map(lambda x: -1 if x is None else x, enc.word_ids))) for enc in enc_original.encodings]
     if batch_original_sentences != batch_noisy_sentences:
         enc_noisy = BERT_TOKENIZER(sents_original, is_split_into_words=True, truncation=True)
-        wlen_noisy = [1+(max(enc.word_ids, key=lambda x: x or -1) or -1) for enc in enc_noisy.encodings]
+        wlen_noisy = [1+(max(map(lambda x: -1 if x is None else x, enc.word_ids))) for enc in enc_noisy.encodings]
     else:
         wlen_noisy = wlen_original
-    
     valid_pairs = [(s_o[:l_o], s_n[:l_n]) for s_o, s_n, l_o, l_n in zip(sents_original, sents_noisy, wlen_original, wlen_noisy) 
                    if l_o > 0 and l_o == l_n]
     sents_original, sents_noisy = map(list, zip(*valid_pairs)) if valid_pairs else ([], [])
-
+    
     if batch_original_sentences:
         enc = BERT_TOKENIZER(sents_original, return_tensors="pt", is_split_into_words=True, padding=True, truncation=True)
     else:
